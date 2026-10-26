@@ -1,7 +1,8 @@
 name: Daily law updates
 on:
   schedule:
-    - cron: "19 3 * * *"
+    - cron: "19 3 * * *"→ Runs at 03:19
+
   workflow_dispatch:
 permissions:
   contents: write
@@ -14,7 +15,7 @@ jobs:
       PREVIEW_CHAT_ID: ${{ secrets.PREVIEW_CHAT_ID }}
       IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
       IG_ACCOUNT_ID: "17841461054245714"
-      IG_MODE: ${{ vars.IG_MODE || 'preview' }}
+      IG_MODE: off
       PAGES_BASE: https://mjlawsocialmedia.github.io/law-updates-cards
     steps:
       - uses: actions/checkout@v4
@@ -32,3 +33,4 @@ jobs:
           git diff --cached --quiet || (git commit -m "Daily update" && git push)
       - name: Publish to Instagram
         run: python daily.py publish
+
