@@ -1,7 +1,7 @@
 name: Daily law updates
 on:
   schedule:
-    - cron: "19 3 * * *"→ Runs at 03:19
+    - cron: "19 3 * * *"
 
   workflow_dispatch:
 permissions:
