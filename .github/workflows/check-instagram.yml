@@ -1,0 +1,15 @@
+name: Check Instagram token
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+      IG_ACCOUNT_ID: "17841461054245714"
+    steps:
+      - name: Read the Instagram account (read-only, posts nothing)
+        run: |
+          curl -s "https://graph.facebook.com/v25.0/$IG_ACCOUNT_ID?fields=username,followers_count,media_count&access_token=$IG_ACCESS_TOKEN" | sed 's/"access_token":"[^"]*"//g'
+          echo
+          curl -s "https://graph.facebook.com/v25.0/$IG_ACCOUNT_ID/content_publishing_limit?fields=quota_usage,config&access_token=$IG_ACCESS_TOKEN"
