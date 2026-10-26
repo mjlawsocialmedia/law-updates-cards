@@ -32,26 +32,34 @@ def gnews(q):
             + "&hl=en-IN&gl=IN&ceid=IN:en")
 
 CATEGORIES = [
-    ("Court notices", "⚖️", [gnews('"Supreme Court" notice OR circular advocates India'),
-                              gnews('"High Court" circular OR notice advocates Delhi OR Allahabad')]),
-    ("Law vacancies", "💼", [gnews('law vacancy OR "legal officer" OR "judicial service" OR "district court" recruitment India'), gnews('advocate OR "law graduates" vacancy recruitment')]),
-    ("Law internships", "🎓", [gnews('law internship India'), gnews('legal internship 2026 law students apply')]),
-    ("Blog updates", "📝", ["https://advmriduljindal.com/blog/feed/"]),
+    ("Legal news & notifications", "⚖️", [gnews('"Supreme Court" notice OR circular OR notification advocates India'),
+                              gnews('"High Court" circular OR notice OR notification advocates Delhi OR Allahabad'),
+                              gnews('Supreme Court OR High Court legal news India judgment')]),
+    ("Law vacancies & internships", "💼", [gnews('law vacancy OR "legal officer" OR "judicial service" OR "district court" recruitment India'),
+                              gnews('advocate OR "law graduates" vacancy recruitment'),
+                              gnews('law internship India'), gnews('legal internship 2026 law students apply')]),
+    ("Our new blogs", "📝", ["https://advmriduljindal.com/blog/feed/"]),
 ]
 MAX_ITEMS = 5
 
 LAW = r"\b(law|legal|advocate|judicial|judge|court|tribunal|llb|llm|lawyer|counsel|paralegal|clerk|district courts?|high court|supreme court)\b"
-FILTERS = {
-    "Court notices": (r"\b(notice|circular|order|directs?|issues?|bench|roster|e-?filing|listing|vacation|rules?|bail|petition|plea|sc|hc)\b", r"\b(ipo|stake|acts? on|advises|ranking|exam pattern|syllabus)\b"),
-    "Law vacancies": (r"(" + LAW + r").*(recruit|vacanc|hiring|post|apply|opening|job|exam|notification)|(recruit|vacanc|hiring|apply|opening|job|exam|notification).*(" + LAW + r")", r"\b(railway|rrb|bhel|nlc|upessc|ssc|bank|police constable|teacher|syllabus|admit card|result|answer key)\b"),
-    "Law internships": (r"\binternships?\b", r"\b(smuggling|ipo|detention|dna)\b"),
-    "Blog updates": (r".", r"^$"),
-}
+VACANCY = (r"(" + LAW + r").*(recruit|vacanc|hiring|post|apply|opening|job|exam|notification)|(recruit|vacanc|hiring|apply|opening|job|exam|notification).*(" + LAW + r")",
+           r"\b(railway|rrb|bhel|nlc|upessc|ssc|bank|police constable|teacher|syllabus|admit card|result|answer key)\b")
+INTERN = (r"\binternships?\b", r"\b(smuggling|ipo|detention|dna)\b")
+NEWS = (r"\b(notice|circular|notification|order|directs?|issues?|bench|roster|e-?filing|listing|vacation|rules?|bail|petition|plea|sc|hc|judgment|verdict|ruling|holds|quashes|upholds)\b",
+        r"\b(ipo|stake|acts? on|advises|ranking|exam pattern|syllabus)\b")
+
+def _match(rule, t):
+    inc, exc = rule
+    return bool(re.search(inc, t, re.I)) and not re.search(exc, t, re.I)
 
 def relevant(name, title):
-    inc, exc = FILTERS[name]
     t = title.lower()
-    return bool(re.search(inc, t, re.I)) and not re.search(exc, t, re.I) and (name != "Law internships" or bool(re.search(LAW, t, re.I)))
+    if name == "Legal news & notifications":
+        return _match(NEWS, t)
+    if name == "Law vacancies & internships":
+        return _match(VACANCY, t) or (_match(INTERN, t) and bool(re.search(LAW, t, re.I)))
+    return True  # Our new blogs
 
 def fetch(url):
     req = urllib.request.Request(url, headers=UA)
@@ -159,7 +167,7 @@ def make_card(result, date_str):
     y = 200
     for name, emoji, _ in CATEGORIES:
         items = result[name][:2]
-        if not items or name == "Blog updates" and not items:
+        if not items:
             continue
         if y > 880:
             break
