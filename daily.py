@@ -37,10 +37,29 @@ CATEGORIES = [
                               gnews('Supreme Court OR High Court legal news India judgment')]),
     ("Law vacancies & internships", "💼", [gnews('law vacancy OR "legal officer" OR "judicial service" OR "district court" recruitment India'),
                               gnews('advocate OR "law graduates" vacancy recruitment'),
-                              gnews('law internship India'), gnews('legal internship 2026 law students apply')]),
+                              gnews('law internship India'), gnews('legal internship 2026 law students apply'),
+                              "https://www.lawctopus.com/category/opportunities-events/jobs/feed/",
+                              "https://www.lawctopus.com/category/opportunities-events/internships-small-projects/feed/"]),
     ("Our new blogs", "📝", ["https://advmriduljindal.com/blog/feed/"]),
 ]
 MAX_ITEMS = 5
+MAX_ITEMS_BY_CAT = {"Law vacancies & internships": 8}
+PER_FEED_CAP = 3  # so one source can't fill a whole section
+TRUSTED = ("lawctopus.com",)  # curated legal job/internship feeds: skip keyword filter
+SOURCE_NAMES = {"lawctopus.com": "Lawctopus"}
+
+def _li(keywords, location):
+    return ("https://www.linkedin.com/jobs/search/?" + urllib.parse.urlencode(
+        {"keywords": keywords, "location": location, "f_TPR": "r86400"}))
+
+# LinkedIn has no public feed, so we link to live searches (posted in last 24h)
+LINKEDIN_LINKS = {
+    "Law vacancies & internships": [
+        ("Legal internships in India", _li("legal intern", "India")),
+        ("Legal jobs in Delhi NCR", _li("lawyer OR advocate OR legal associate", "Delhi, India")),
+        ("Legal jobs across India", _li("lawyer OR advocate OR legal counsel", "India")),
+    ],
+}
 
 LAW = r"\b(law|legal|advocate|judicial|judge|court|tribunal|llb|llm|lawyer|counsel|paralegal|clerk|district courts?|high court|supreme court)\b"
 VACANCY = (r"(" + LAW + r").*(recruit|vacanc|hiring|post|apply|opening|job|exam|notification)|(recruit|vacanc|hiring|apply|opening|job|exam|notification).*(" + LAW + r")",
@@ -97,21 +116,27 @@ def collect(state):
     for name, _emoji, urls in CATEGORIES:
         items, titles = [], set()
         for u in urls:
+            trusted = next((d for d in TRUSTED if d in u), None)
             try:
+                feed_items = []
                 for e in parse(fetch(u)):
                     key = re.sub(r"\W+", " ", e["title"].lower()).strip()
                     if not e["title"] or key in titles or e["link"] in seen:
                         continue
-                    if not relevant(name, e["title"]):
+                    if not trusted and not relevant(name, e["title"]):
                         continue
                     if e["when"] and (now - e["when"]).total_seconds() > 36 * 3600:
                         continue
+                    if trusted and not e["source"]:
+                        e["source"] = SOURCE_NAMES.get(trusted, trusted)
                     titles.add(key)
-                    items.append(e)
+                    feed_items.append(e)
+                feed_items.sort(key=lambda e: e["when"] or now, reverse=True)
+                items.extend(feed_items[:PER_FEED_CAP])
             except Exception as exc:
                 print(f"[warn] {name}: {u}: {exc}", file=sys.stderr)
         items.sort(key=lambda e: e["when"] or now, reverse=True)
-        result[name] = items[:MAX_ITEMS]
+        result[name] = items[:MAX_ITEMS_BY_CAT.get(name, MAX_ITEMS)]
     return result
 
 def tg(method, token, **data):
@@ -124,12 +149,17 @@ def telegram_posts(token, chat_id, result, dry):
     footer = "\n\n— Law Chambers of Mridul Jindal | advmriduljindal.com"
     for name, emoji, _ in CATEGORIES:
         items = result[name]
-        if not items:
+        links = LINKEDIN_LINKS.get(name, [])
+        if not items and not links:
             continue
         lines = [f"{emoji} <b>{html.escape(name)}</b>"]
         for i, e in enumerate(items, 1):
             src = f" ({html.escape(e['source'])})" if e["source"] else ""
             lines.append(f"{i}. <a href=\"{html.escape(e['link'], quote=True)}\">{html.escape(e['title'])}</a>{src}")
+        if links:
+            lines.append("\n🔗 <b>Latest on LinkedIn (last 24 hrs):</b>")
+            for label, url in links:
+                lines.append(f"• <a href=\"{html.escape(url, quote=True)}\">{html.escape(label)}</a>")
         text = "\n".join(lines) + footer
         if dry:
             print(text, "\n")
