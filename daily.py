@@ -34,11 +34,24 @@ def gnews(q):
 CATEGORIES = [
     ("Court notices", "⚖️", [gnews('"Supreme Court" notice OR circular advocates India'),
                               gnews('"High Court" circular OR notice advocates Delhi OR Allahabad')]),
-    ("Law vacancies", "💼", [gnews('legal vacancy OR "law officer" OR "judicial service" recruitment India')]),
-    ("Law internships", "🎓", [gnews('law internship India')]),
+    ("Law vacancies", "💼", [gnews('law vacancy OR "legal officer" OR "judicial service" OR "district court" recruitment India'), gnews('advocate OR "law graduates" vacancy recruitment')]),
+    ("Law internships", "🎓", [gnews('law internship India'), gnews('legal internship 2026 law students apply')]),
     ("Blog updates", "📝", ["https://advmriduljindal.com/blog/feed/"]),
 ]
 MAX_ITEMS = 5
+
+LAW = r"\b(law|legal|advocate|judicial|judge|court|tribunal|llb|llm|lawyer|counsel|paralegal|clerk|district courts?|high court|supreme court)\b"
+FILTERS = {
+    "Court notices": (r"\b(notice|circular|order|directs?|issues?|bench|roster|e-?filing|listing|vacation|rules?|bail|petition|plea|sc|hc)\b", r"\b(ipo|stake|acts? on|advises|ranking|exam pattern|syllabus)\b"),
+    "Law vacancies": (r"(" + LAW + r").*(recruit|vacanc|hiring|post|apply|opening|job|exam|notification)|(recruit|vacanc|hiring|apply|opening|job|exam|notification).*(" + LAW + r")", r"\b(railway|rrb|bhel|nlc|upessc|ssc|bank|police constable|teacher|syllabus|admit card|result|answer key)\b"),
+    "Law internships": (r"\binternships?\b", r"\b(smuggling|ipo|detention|dna)\b"),
+    "Blog updates": (r".", r"^$"),
+}
+
+def relevant(name, title):
+    inc, exc = FILTERS[name]
+    t = title.lower()
+    return bool(re.search(inc, t, re.I)) and not re.search(exc, t, re.I) and (name != "Law internships" or bool(re.search(LAW, t, re.I)))
 
 def fetch(url):
     req = urllib.request.Request(url, headers=UA)
@@ -80,6 +93,8 @@ def collect(state):
                 for e in parse(fetch(u)):
                     key = re.sub(r"\W+", " ", e["title"].lower()).strip()
                     if not e["title"] or key in titles or e["link"] in seen:
+                        continue
+                    if not relevant(name, e["title"]):
                         continue
                     if e["when"] and (now - e["when"]).total_seconds() > 36 * 3600:
                         continue
