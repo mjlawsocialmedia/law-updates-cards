@@ -1,0 +1,34 @@
+name: Daily law updates
+on:
+  schedule:
+    - cron: "19 3 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: "-1002223491327"
+      PREVIEW_CHAT_ID: ${{ secrets.PREVIEW_CHAT_ID }}
+      IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+      IG_ACCOUNT_ID: "17841461054245714"
+      IG_MODE: ${{ vars.IG_MODE || 'preview' }}
+      PAGES_BASE: https://mjlawsocialmedia.github.io/law-updates-cards
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pillow
+      - name: Collect, post to Telegram, build card
+        run: python daily.py collect
+      - name: Save state and card
+        run: |
+          git config user.name "law-updates-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add -A state.json cards
+          git diff --cached --quiet || (git commit -m "Daily update" && git push)
+      - name: Publish to Instagram
+        run: python daily.py publish
